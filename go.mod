@@ -1,8 +1,9 @@
-module github.com/mong0520/gphoto-client
+module github.com/mong0520/google-photo-viewer
 
 require (
 	github.com/danieljoos/wincred v1.0.2 // indirect
 	github.com/fatih/color v1.7.0 // indirect
+	github.com/gin-gonic/gin v1.6.3
 	github.com/godbus/dbus v4.1.0+incompatible // indirect
 	github.com/joho/godotenv v1.3.0
 	github.com/mattn/go-colorable v0.1.2 // indirect

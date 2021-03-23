@@ -1,0 +1,21 @@
+<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css" integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/js/bootstrap.min.js" integrity="sha384-ChfqqxuZUCnJSK3+MXmPNIyE6ZbWh2IMqE241rYiqJxyMiZ6OW/JmZQ5stwEULTy" crossorigin="anonymous"></script>
+<html>
+{{/*{{ range $album := .albums }}*/}}
+{{/*    <h1>{{ .Title }}</h1>*/}}
+{{/*    <h3>{{ .Url }}</h3>*/}}
+{{/*    <hr/>*/}}
+{{/*{{ end }}*/}}
+    <TABLE class= "table table-sm">
+        <tr class="headingTr">
+            <td>Title</td>
+            <td>URL</td>
+        </tr>
+        {{ range $album := .albums }}
+        <tr>
+            <td>{{ .Title }}</td>
+            <td>{{ .Url }}</td>
+        </tr>
+        {{ end }}
+    </TABLE>
+</html>
