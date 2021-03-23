@@ -8,12 +8,15 @@ import (
 
 
 func Handler(c *gin.Context){
+    accountIdxInt := c.Param("idx")
+
     svc, err := services.GetGooglePhotoService()
     if err != nil {
         c.Error(err)
     }
 
-    albums, err := svc.GetAlbums()
+    options := &services.GetGetAlbumsOptions{AccountIndex: accountIdxInt}
+    albums, err := svc.GetAlbums(options)
     if err != nil {
         c.Error(err)
     }

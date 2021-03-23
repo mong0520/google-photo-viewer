@@ -1,21 +1,22 @@
 package services
 
 import (
-	"context"
-	"encoding/json"
-	"errors"
-	"fmt"
-	"os"
-	"os/user"
+    "context"
+    "encoding/json"
+    "errors"
+    "fmt"
+    "os"
+    "os/user"
+    "strings"
 
-	"github.com/joho/godotenv"
-	log "github.com/sirupsen/logrus"
+    "github.com/joho/godotenv"
+    log "github.com/sirupsen/logrus"
 
-	oauth2ns "github.com/nmrshll/oauth2-noserver"
-	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/google"
-	"google.golang.org/api/photoslibrary/v1"
-    keyring "github.com/zalando/go-keyring"
+    oauth2ns "github.com/nmrshll/oauth2-noserver"
+    "github.com/zalando/go-keyring"
+    "golang.org/x/oauth2"
+    "golang.org/x/oauth2/google"
+    "google.golang.org/api/photoslibrary/v1"
 )
 
 const (
@@ -31,6 +32,10 @@ var googlePhotoService *GooglePhotoService
 type WrappedGooglePhotoAlbum struct {
     Title string
     Url   string
+}
+
+type GetGetAlbumsOptions struct {
+    AccountIndex string
 }
 
 type WrappedGooglePhotoAlbums []WrappedGooglePhotoAlbum
@@ -60,7 +65,7 @@ func GetGooglePhotoService() (*GooglePhotoService, error){
 	client := &oauth2ns.AuthorizedClient{}
 	// Try to use existing token
 	existToken, err := retrieveToken(user.Name)
-	forceToken := false
+	forceToken := true
 	service := &photoslibrary.Service{}
 
 	if err != nil || forceToken == true {
@@ -93,41 +98,48 @@ func GetGooglePhotoService() (*GooglePhotoService, error){
     return googlePhotoService, nil
 }
 
-func (g *GooglePhotoService)GetAlbums() ([]WrappedGooglePhotoAlbum, error) {
+func (g *GooglePhotoService)GetAlbums(options *GetGetAlbumsOptions) ([]WrappedGooglePhotoAlbum, error) {
     var wrappedGooglePhotoAlbums []WrappedGooglePhotoAlbum
     albumsService := g.AlbumsService
 	albumList := albumsService.List()
 	ret, err := albumList.PageSize(50).Do()
+    albumList.Fields()
 	albumList.Do()
 	if err != nil {
 		log.Fatal(err)
 		return wrappedGooglePhotoAlbums, err
 	}
 	for _, album := range ret.Albums {
-		fmt.Println(album.Title, album.ProductUrl)
+		if options.AccountIndex != ""{
+            album.ProductUrl = strings.Replace(album.ProductUrl, "photos.google.com", "photos.google.com/u/"+ options.AccountIndex, -1)
+        }
+        fmt.Println(album.Title, album.ProductUrl)
         wrappedGooglePhotoAlbums = append(wrappedGooglePhotoAlbums, WrappedGooglePhotoAlbum{
             Title: album.Title,
             Url:   album.ProductUrl,
         })
 	}
-	//for {
-	//	nextPageToken := ret.NextPageToken
-	//	if nextPageToken == "" {
-	//		break
-	//	}
-	//	ret, err = albumList.PageToken(nextPageToken).PageSize(50).Do()
-	//	if err != nil {
-	//		log.Fatal(err)
-	//		return wrappedGooglePhotoAlbums, err
-	//	}
-	//	for _, album := range ret.Albums {
-	//		fmt.Println(album.Title, album.ProductUrl)
-    //        wrappedGooglePhotoAlbums = append(wrappedGooglePhotoAlbums, WrappedGooglePhotoAlbum{
-    //            Title: album.Title,
-    //            Url:   album.ProductUrl,
-    //        })
-	//	}
-	//}
+	for {
+		nextPageToken := ret.NextPageToken
+		if nextPageToken == "" {
+			break
+		}
+		ret, err = albumList.PageToken(nextPageToken).PageSize(50).Do()
+		if err != nil {
+			log.Fatal(err)
+			return wrappedGooglePhotoAlbums, err
+		}
+		for _, album := range ret.Albums {
+            if options.AccountIndex != ""{
+                album.ProductUrl = strings.Replace(album.ProductUrl, "photos.google.com", "photos.google.com/u/"+ options.AccountIndex, -1)
+            }
+            fmt.Println(album.Title, album.ProductUrl)
+           wrappedGooglePhotoAlbums = append(wrappedGooglePhotoAlbums, WrappedGooglePhotoAlbum{
+               Title: album.Title,
+               Url:   album.ProductUrl,
+           })
+		}
+	}
 
 	return wrappedGooglePhotoAlbums, nil
 }
