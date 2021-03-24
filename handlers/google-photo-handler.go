@@ -71,6 +71,7 @@ func GooglePhotoHandler(c *gin.Context){
 
     c.HTML(http.StatusOK, "albums.html", gin.H{
         "albums": albums,
+        "userInfo": userInfo,
     })
 
 }

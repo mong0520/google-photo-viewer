@@ -59,6 +59,26 @@ func LoginHandler(c *gin.Context){
     c.Redirect(http.StatusTemporaryRedirect, url)
 }
 
+func CallbackHandler(c *gin.Context){
+    session := sessions.Default(c)
+    accountIdx := c.Query("state")
+    userInfo, token, err := getAccessToken(c.Query("state"), c.Query("code"))
+    if err != nil {
+        c.Error(err)
+    }
+
+    session.Set("user-info", userInfo)
+    session.Set("conf", conf)
+    session.Set("token", token)
+    session.Save()
+    //err = utils.StoreToken(userInfo.ID, token)
+    //if err != nil {
+    //    c.Error(err)
+    //}
+    c.Redirect(http.StatusTemporaryRedirect, fmt.Sprintf("/u/%s/albums", accountIdx))
+}
+
+
 
 func getAccessToken(state string, code string) (*UserInfo, *oauth2.Token, error) {
     if state != oauthStateString {
@@ -88,21 +108,3 @@ func getAccessToken(state string, code string) (*UserInfo, *oauth2.Token, error)
     return userInfo, token, nil
 }
 
-func CallbackHandler(c *gin.Context){
-    session := sessions.Default(c)
-    accountIdx := c.Query("state")
-    userInfo, token, err := getAccessToken(c.Query("state"), c.Query("code"))
-    if err != nil {
-        c.Error(err)
-    }
-
-    session.Set("user-info", userInfo)
-    session.Set("conf", conf)
-    session.Set("token", token)
-    session.Save()
-    //err = utils.StoreToken(userInfo.ID, token)
-    //if err != nil {
-    //    c.Error(err)
-    //}
-    c.Redirect(http.StatusTemporaryRedirect, fmt.Sprintf("/u/%s/albums", accountIdx))
-}
