@@ -7,6 +7,7 @@ import (
     "github.com/gin-gonic/gin"
     "github.com/mong0520/google-photo-viewer/handlers"
     "golang.org/x/oauth2"
+    "net/http"
 )
 
 // Book ...
@@ -30,5 +31,8 @@ func main() {
     r.GET("/u/:idx", handlers.MainHandler)
     r.GET("/login/u/:idx", handlers.LoginHandler)
     r.GET("/callback", handlers.CallbackHandler)
+    r.GET("/check", func(c *gin.Context) {
+        c.String(http.StatusOK, "ok")
+    })
     r.Run(":8080")
 }
