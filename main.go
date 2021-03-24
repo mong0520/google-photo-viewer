@@ -16,6 +16,6 @@ func main() {
 	r := gin.Default()
 	r.LoadHTMLGlob("view/*")
 
-	r.GET("/:idx", handlers.Handler)
+	r.GET("/photos/:idx", handlers.Handler)
 	log.Fatal(r.Run())
 }

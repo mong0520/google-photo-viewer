@@ -1,0 +1,19 @@
+version: '3'
+services:
+#  service:
+#    restart: always
+#    build: .
+#    ports:
+#      - 80:5000
+#    env_file:
+#      - .env
+#    depends_on:
+#      - redis
+  redis:
+    restart: always
+    container_name: redis
+    image: redis:alpine
+    ports:
+      - 6379:6379
+    volumes:
+      - ./data/redis-data:/data

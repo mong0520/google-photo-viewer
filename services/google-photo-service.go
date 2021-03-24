@@ -6,7 +6,6 @@ import (
     "errors"
     "fmt"
     "os"
-    "os/user"
     "strings"
 
     "github.com/joho/godotenv"
@@ -16,6 +15,7 @@ import (
     "github.com/zalando/go-keyring"
     "golang.org/x/oauth2"
     "golang.org/x/oauth2/google"
+    "google.golang.org/api/people/v1"
     "google.golang.org/api/photoslibrary/v1"
 )
 
@@ -26,12 +26,14 @@ const (
 type GooglePhotoService struct {
     Service *photoslibrary.Service
     AlbumsService *photoslibrary.AlbumsService
+    //PeopleService *people.PeopleService
+    //RedisService *redis.Client
 }
 var googlePhotoService *GooglePhotoService
 
 type WrappedGooglePhotoAlbum struct {
-    Title string
-    Url   string
+    Title string `json:"title"`
+    Url   string `json:"url"`
 }
 
 type GetGetAlbumsOptions struct {
@@ -40,7 +42,7 @@ type GetGetAlbumsOptions struct {
 
 type WrappedGooglePhotoAlbums []WrappedGooglePhotoAlbum
 
-func GetGooglePhotoService() (*GooglePhotoService, error){
+func GetGooglePhotoService(user string) (*GooglePhotoService, error){
     if googlePhotoService != nil{
         return googlePhotoService, nil
     }
@@ -48,15 +50,19 @@ func GetGooglePhotoService() (*GooglePhotoService, error){
     googlePhotoService = &GooglePhotoService{}
 
     godotenv.Load()
-	user, err := user.Current()
-	if err != nil {
-		panic(err)
-	}
+	//user, err := user.Current()
+	//if err != nil {
+	//	panic(err)
+	//}
 	// ask the user to authenticate on google in the browser
 	conf := &oauth2.Config{
 		ClientID:     os.Getenv("ClientID"),
 		ClientSecret: os.Getenv("ClientSecret"),
-		Scopes:       []string{photoslibrary.PhotoslibraryScope},
+		Scopes:       []string{
+		    photoslibrary.PhotoslibraryScope,
+		    people.UserEmailsReadScope, // required
+		    people.UserinfoProfileScope, // required
+		},
 		Endpoint: oauth2.Endpoint{
 			AuthURL:  google.Endpoint.AuthURL,
 			TokenURL: google.Endpoint.TokenURL,
@@ -64,8 +70,8 @@ func GetGooglePhotoService() (*GooglePhotoService, error){
 	}
 	client := &oauth2ns.AuthorizedClient{}
 	// Try to use existing token
-	existToken, err := retrieveToken(user.Name)
-	forceToken := true
+	existToken, err := retrieveToken(user)
+	forceToken := false
 	service := &photoslibrary.Service{}
 
 	if err != nil || forceToken == true {
@@ -79,7 +85,7 @@ func GetGooglePhotoService() (*GooglePhotoService, error){
 		}
 
 		// Store it
-		storeToken(user.Name, client.Token)
+		storeToken(user, client.Token)
 	} else {
 		// Use existing one
 		client = &oauth2ns.AuthorizedClient{
@@ -87,14 +93,22 @@ func GetGooglePhotoService() (*GooglePhotoService, error){
 			Token:  existToken,
 		}
 	}
+    //peopleService := &people.Service{}
+    //peopleService, err = people.New(client.Client)
+    //fmt.Println(err)
+    //ret, err := peopleService.People.Get("people/me").PersonFields("emailAddresses").Do()
+    //fmt.Println(err)
+    //fmt.Println(ret.EmailAddresses)
 
 	service, err = photoslibrary.New(client.Client)
 	if err != nil{
         return googlePhotoService, err
     }
 
+
     googlePhotoService.Service = service
     googlePhotoService.AlbumsService = photoslibrary.NewAlbumsService(service)
+    //googlePhotoService.PeopleService = people.NewPeopleService(peopleService)
     return googlePhotoService, nil
 }
 
@@ -109,6 +123,7 @@ func (g *GooglePhotoService)GetAlbums(options *GetGetAlbumsOptions) ([]WrappedGo
 		log.Fatal(err)
 		return wrappedGooglePhotoAlbums, err
 	}
+	// first time
 	for _, album := range ret.Albums {
 		if options.AccountIndex != ""{
             album.ProductUrl = strings.Replace(album.ProductUrl, "photos.google.com", "photos.google.com/u/"+ options.AccountIndex, -1)
@@ -130,17 +145,16 @@ func (g *GooglePhotoService)GetAlbums(options *GetGetAlbumsOptions) ([]WrappedGo
 			return wrappedGooglePhotoAlbums, err
 		}
 		for _, album := range ret.Albums {
-            if options.AccountIndex != ""{
-                album.ProductUrl = strings.Replace(album.ProductUrl, "photos.google.com", "photos.google.com/u/"+ options.AccountIndex, -1)
-            }
-            fmt.Println(album.Title, album.ProductUrl)
+           if options.AccountIndex != ""{
+               album.ProductUrl = strings.Replace(album.ProductUrl, "photos.google.com", "photos.google.com/u/"+ options.AccountIndex, -1)
+           }
+           fmt.Println(album.Title, album.ProductUrl)
            wrappedGooglePhotoAlbums = append(wrappedGooglePhotoAlbums, WrappedGooglePhotoAlbum{
-               Title: album.Title,
-               Url:   album.ProductUrl,
-           })
+              Title: album.Title,
+              Url:   album.ProductUrl,
+          })
 		}
 	}
-
 	return wrappedGooglePhotoAlbums, nil
 }
 

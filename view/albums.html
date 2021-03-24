@@ -9,12 +9,10 @@
     <TABLE class= "table table-sm">
         <tr class="headingTr">
             <td>Title</td>
-            <td>URL</td>
         </tr>
         {{ range $album := .albums }}
         <tr>
-            <td>{{ .Title }}</td>
-            <td>{{ .Url }}</td>
+            <td><a href="{{ .Url }}">{{ .Title }}</a></td>
         </tr>
         {{ end }}
     </TABLE>
