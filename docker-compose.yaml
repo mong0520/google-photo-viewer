@@ -1,14 +1,14 @@
 version: '3'
 services:
-#  service:
-#    restart: always
-#    build: .
-#    ports:
-#      - 80:5000
-#    env_file:
-#      - .env
-#    depends_on:
-#      - redis
+  service:
+    restart: always
+    build: .
+    ports:
+      - 8080:8080
+    env_file:
+      - .env
+    depends_on:
+      - redis
   redis:
     restart: always
     container_name: redis

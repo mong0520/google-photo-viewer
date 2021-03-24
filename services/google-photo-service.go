@@ -3,7 +3,6 @@ package services
 import (
     "context"
     "fmt"
-    "github.com/mong0520/google-photo-viewer/utils"
     "strings"
 
     log "github.com/sirupsen/logrus"
@@ -35,33 +34,29 @@ type GetGetAlbumsOptions struct {
 
 type WrappedGooglePhotoAlbums []WrappedGooglePhotoAlbum
 
-func GetGooglePhotoService(user string, conf *oauth2.Config) (*GooglePhotoService, error){
+func GetGooglePhotoService(conf *oauth2.Config, token *oauth2.Token) (*GooglePhotoService, error){
     if googlePhotoService != nil{
         return googlePhotoService, nil
     }
 
     googlePhotoService = &GooglePhotoService{}
-
-	//forceToken := false
-	//if forceToken{
-	//    return nil, errors.New("force renew token")
-    //}
 	service := &photoslibrary.Service{}
 
-	existToken, err := utils.RetrieveToken(user)
-	if err != nil{
-	    return nil, err
-    }
-    client := conf.Client(context.Background(), existToken)
+	//existToken, err := utils.RetrieveToken(user)
+	//if err != nil{
+	//    return nil, err
+    //}
 
-	service, err = photoslibrary.New(client)
+    client := conf.Client(context.Background(), token)
+	service, err := photoslibrary.New(client)
 	if err != nil{
         return googlePhotoService, err
     }
 
 
     googlePhotoService.Service = service
-    googlePhotoService.AlbumsService = photoslibrary.NewAlbumsService(service)
+    googlePhotoService.AlbumsService = service.Albums
+
     //googlePhotoService.PeopleService = people.NewPeopleService(peopleService)
     return googlePhotoService, nil
 }

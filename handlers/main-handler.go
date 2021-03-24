@@ -7,5 +7,8 @@ import (
 
 
 func MainHandler(c *gin.Context){
-    c.HTML(http.StatusOK, "login.html", nil)
+    accountIdx := c.Param("idx")
+    c.HTML(http.StatusOK, "login.html", gin.H{
+        "accountIdx": accountIdx,
+    })
 }

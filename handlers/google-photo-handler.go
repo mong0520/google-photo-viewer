@@ -19,30 +19,35 @@ func GooglePhotoHandler(c *gin.Context){
     accountIdxInt := c.Param("idx")
     userInfoVal := session.Get("user-info")
     if userInfoVal == nil {
-        c.Redirect(http.StatusTemporaryRedirect, "/")
+        c.Redirect(http.StatusTemporaryRedirect, fmt.Sprintf("/u/%s", accountIdxInt))
     }
     userInfo := userInfoVal.(*UserInfo)
     confVal := session.Get("conf")
     if confVal == nil {
-        c.Redirect(http.StatusTemporaryRedirect, "/")
+        c.Redirect(http.StatusTemporaryRedirect, fmt.Sprintf("/u/%s", accountIdxInt))
     }
     conf := confVal.(*oauth2.Config)
+
+    tokenVal := session.Get("token")
+    if tokenVal == nil {
+        c.Redirect(http.StatusTemporaryRedirect, fmt.Sprintf("/u/%s", accountIdxInt))
+    }
+    token := tokenVal.(*oauth2.Token)
     redisSvc := services.GetRedisService()
     if redisSvc == nil{
         c.Error(errors.New("unable to get redis client"))
     }
 
-    svc, err := services.GetGooglePhotoService(userInfo.ID, conf)
-    if err != nil {
-        c.Error(err)
-    }
-
-    options := &services.GetGetAlbumsOptions{AccountIndex: accountIdxInt}
-
     // Get result from redis
     var albums []services.WrappedGooglePhotoAlbum
-    result, err := redisSvc.Get(context.Background(), generateRedisKey(userInfo.ID, accountIdxInt)).Bytes()
+    result, err := redisSvc.Get(context.Background(), userInfo.ID).Bytes()
     if err != nil || len(result) == 0 {
+        // not hit cache
+        options := &services.GetGetAlbumsOptions{AccountIndex: accountIdxInt}
+        svc, err := services.GetGooglePhotoService(conf, token)
+        if err != nil {
+            c.Error(err)
+        }
         albums, err = svc.GetAlbums(options)
         if err != nil {
             c.Error(err)
@@ -52,11 +57,12 @@ func GooglePhotoHandler(c *gin.Context){
         if err != nil {
             c.Error(err)
         }
-        _, err = redisSvc.SetEX(context.Background(), generateRedisKey(userInfo.ID, accountIdxInt), albumsBytes, 86400 * time.Second).Result()
+        _, err = redisSvc.SetEX(context.Background(), userInfo.ID, albumsBytes, 86400 * time.Second).Result()
         if err != nil {
             c.Error(err)
         }
     }else{
+        // hit cache
         err := json.Unmarshal(result, &albums)
         if err != nil {
             c.Error(err)
@@ -67,8 +73,4 @@ func GooglePhotoHandler(c *gin.Context){
         "albums": albums,
     })
 
-}
-
-func generateRedisKey(user string, idx string) string{
-    return fmt.Sprintf("user:%s:idx:%s", user, idx)
 }

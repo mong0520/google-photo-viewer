@@ -2,12 +2,12 @@ package handlers
 
 import "C"
 import (
+    "context"
     "encoding/json"
     "fmt"
     "github.com/gin-contrib/sessions"
     "github.com/gin-gonic/gin"
     "github.com/joho/godotenv"
-    "github.com/mong0520/google-photo-viewer/utils"
     "golang.org/x/oauth2"
     "golang.org/x/oauth2/google"
     "google.golang.org/api/people/v1"
@@ -36,6 +36,7 @@ var (
 
 func LoginHandler(c *gin.Context){
     // get Google App clients and secrets
+    oauthStateString = c.Param("idx")
     godotenv.Load()
     // ask the user to authenticate on google in the browser
     // ref: https://itnext.io/getting-started-with-oauth2-in-go-1c692420e03
@@ -63,7 +64,7 @@ func getAccessToken(state string, code string) (*UserInfo, *oauth2.Token, error)
     if state != oauthStateString {
         return nil, nil, fmt.Errorf("invalid oauth state")
     }
-    token, err := conf.Exchange(oauth2.NoContext, code)
+    token, err := conf.Exchange(context.Background(), code)
     if err != nil {
         return nil, nil, fmt.Errorf("code exchange failed: %s", err.Error())
     }
@@ -89,6 +90,7 @@ func getAccessToken(state string, code string) (*UserInfo, *oauth2.Token, error)
 
 func CallbackHandler(c *gin.Context){
     session := sessions.Default(c)
+    accountIdx := c.Query("state")
     userInfo, token, err := getAccessToken(c.Query("state"), c.Query("code"))
     if err != nil {
         c.Error(err)
@@ -96,10 +98,11 @@ func CallbackHandler(c *gin.Context){
 
     session.Set("user-info", userInfo)
     session.Set("conf", conf)
+    session.Set("token", token)
     session.Save()
-    err = utils.StoreToken(userInfo.ID, token)
-    if err != nil {
-        c.Error(err)
-    }
-    c.Redirect(http.StatusTemporaryRedirect, "/photos/1")
+    //err = utils.StoreToken(userInfo.ID, token)
+    //if err != nil {
+    //    c.Error(err)
+    //}
+    c.Redirect(http.StatusTemporaryRedirect, fmt.Sprintf("/u/%s/albums", accountIdx))
 }

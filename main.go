@@ -20,14 +20,15 @@ type Book struct {
 func main() {
     gob.Register(&handlers.UserInfo{})
     gob.Register(&oauth2.Config{})
+    gob.Register(&oauth2.Token{})
 	r := gin.Default()
     store := cookie.NewStore([]byte("secret"))
     r.Use(sessions.Sessions("mysession", store))
 	r.LoadHTMLGlob("view/*")
 
-	r.GET("/photos/:idx", handlers.GooglePhotoHandler)
-    r.GET("/", handlers.MainHandler)
-    r.GET("/login", handlers.LoginHandler)
+	r.GET("/u/:idx/albums", handlers.GooglePhotoHandler)
+    r.GET("/u/:idx", handlers.MainHandler)
+    r.GET("/login/u/:idx", handlers.LoginHandler)
     r.GET("/callback", handlers.CallbackHandler)
     r.Run(":8080")
 }
