@@ -34,5 +34,5 @@ func main() {
     r.GET("/check", func(c *gin.Context) {
         c.String(http.StatusOK, "ok")
     })
-    r.Run(":8080")
+    r.Run(":80")
 }
