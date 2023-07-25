@@ -17,3 +17,11 @@ services:
       - 6379:6379
     volumes:
       - ./data/redis-data:/data
+
+  mongo:
+    image: mongo
+    container_name: mongodb-container
+    ports:
+      - '27017:27017'
+    volumes:
+      - ./.docker/mongo_data:/data/db

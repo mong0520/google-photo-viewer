@@ -2,109 +2,135 @@ package handlers
 
 import "C"
 import (
-    "context"
-    "encoding/json"
-    "fmt"
-    "github.com/gin-contrib/sessions"
-    "github.com/gin-gonic/gin"
-    "github.com/joho/godotenv"
-    "golang.org/x/oauth2"
-    "golang.org/x/oauth2/google"
-    "google.golang.org/api/people/v1"
-    "google.golang.org/api/photoslibrary/v1"
-    "io/ioutil"
-    "net/http"
-    "os"
+	"context"
+	"encoding/json"
+	"fmt"
+	"github.com/gin-contrib/sessions"
+	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
+	"github.com/mong0520/google-photo-viewer/utils"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
+	"google.golang.org/api/people/v1"
+	"google.golang.org/api/photoslibrary/v1"
+	"io/ioutil"
+	"net/http"
+	"os"
 )
 
 type UserInfo struct {
-    ID         string `json:"id"`
-    Name       string `json:"name"`
-    GivenName  string `json:"given_name"`
-    FamilyName string `json:"family_name"`
-    Picture    string `json:"picture"`
-    Locale     string `json:"locale"`
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	GivenName  string `json:"given_name"`
+	FamilyName string `json:"family_name"`
+	Picture    string `json:"picture"`
+	Locale     string `json:"locale"`
 }
 
 var (
-    // TODO: randomize it
-    oauthStateString = "pseudo-random"
-    conf *oauth2.Config
-    userInfo *UserInfo
+	// TODO: randomize it
+	oauthStateString = "pseudo-random"
+	conf             *oauth2.Config
+	userInfo         *UserInfo
 )
 
+func MeHandler(c *gin.Context) {
+	session := sessions.Default(c)
+	// accountIdxInt := c.Param("idx")
+	userInfoVal := session.Get("user-info")
+	if userInfoVal == nil {
+		c.Redirect(http.StatusTemporaryRedirect, "/auth")
+		return
+	}
+	_, err := utils.RetrieveOAuthConf(c)
+	if err != nil {
+		c.Redirect(http.StatusTemporaryRedirect, "/auth")
+		return
+	}
 
-func LoginHandler(c *gin.Context){
-    // get Google App clients and secrets
-    oauthStateString = c.Param("idx")
-    godotenv.Load()
-    // ask the user to authenticate on google in the browser
-    // ref: https://itnext.io/getting-started-with-oauth2-in-go-1c692420e03
-    conf = &oauth2.Config{
-        ClientID:     os.Getenv("ClientID"),
-        ClientSecret: os.Getenv("ClientSecret"),
-        RedirectURL:  fmt.Sprintf("%s/callback", os.Getenv("HostUrl")),
-        Scopes:       []string{
-            photoslibrary.PhotoslibraryScope,
-            people.UserEmailsReadScope, // required
-            people.UserinfoProfileScope, // required
-        },
-        Endpoint: oauth2.Endpoint{
-            AuthURL:  google.Endpoint.AuthURL,
-            TokenURL: google.Endpoint.TokenURL,
-        },
-    }
+	token, err := utils.RetrieveOAuthToken(c)
+	if err != nil {
+		c.Redirect(http.StatusTemporaryRedirect, "/auth")
+		return
+	}
 
-    url := conf.AuthCodeURL(oauthStateString)
-    c.Redirect(http.StatusTemporaryRedirect, url)
+	userInfo := userInfoVal.(*UserInfo)
+	if userInfo != nil && token != nil {
+		c.HTML(http.StatusOK, "me.html", gin.H{
+			"userInfo": userInfo,
+		})
+	}
 }
 
-func CallbackHandler(c *gin.Context){
-    session := sessions.Default(c)
-    accountIdx := c.Query("state")
-    userInfo, token, err := getAccessToken(c.Query("state"), c.Query("code"))
-    if err != nil {
-        c.Error(err)
-    }
+func LoginHandler(c *gin.Context) {
+	// get Google App clients and secrets
+	// oauthStateString = c.Param("idx")
+	godotenv.Load()
+	// ask the user to authenticate on google in the browser
+	// ref: https://itnext.io/getting-started-with-oauth2-in-go-1c692420e03
+	conf = &oauth2.Config{
+		ClientID:     os.Getenv("ClientID"),
+		ClientSecret: os.Getenv("ClientSecret"),
+		RedirectURL:  fmt.Sprintf("%s/callback", os.Getenv("HostUrl")),
+		Scopes: []string{
+			photoslibrary.PhotoslibraryScope,
+			people.UserEmailsReadScope,  // required
+			people.UserinfoProfileScope, // required
+		},
+		Endpoint: oauth2.Endpoint{
+			AuthURL:  google.Endpoint.AuthURL,
+			TokenURL: google.Endpoint.TokenURL,
+		},
+	}
 
-    session.Set("user-info", userInfo)
-    session.Set("conf", conf)
-    session.Set("token", token)
-    session.Save()
-    //err = utils.StoreToken(userInfo.ID, token)
-    //if err != nil {
-    //    c.Error(err)
-    //}
-    c.Redirect(http.StatusTemporaryRedirect, fmt.Sprintf("/u/%s/albums", accountIdx))
+	url := conf.AuthCodeURL(oauthStateString)
+	c.Redirect(http.StatusTemporaryRedirect, url)
 }
 
+func CallbackHandler(c *gin.Context) {
+	session := sessions.Default(c)
+	// accountIdx := c.Query("state")
+	userInfo, token, err := getAccessToken(c.Query("state"), c.Query("code"))
+	if err != nil {
+		c.Error(err)
+	}
 
+	session.Set("user-info", userInfo)
+	session.Set("conf", conf)
+	session.Set("token", token)
+	session.Save()
+	fmt.Printf("token = %s\n", token)
+	// err = utils.StoreToken(userInfo.ID, token)
+	// if err != nil {
+	//    c.Error(err)
+	// }
+	c.Redirect(http.StatusTemporaryRedirect, "me")
+}
 
 func getAccessToken(state string, code string) (*UserInfo, *oauth2.Token, error) {
-    if state != oauthStateString {
-        return nil, nil, fmt.Errorf("invalid oauth state")
-    }
-    token, err := conf.Exchange(context.Background(), code)
-    if err != nil {
-        return nil, nil, fmt.Errorf("code exchange failed: %s", err.Error())
-    }
+	if state != oauthStateString {
+		return nil, nil, fmt.Errorf("invalid oauth state")
+	}
+	token, err := conf.Exchange(context.Background(), code)
+	if err != nil {
+		return nil, nil, fmt.Errorf("code exchange failed: %s", err.Error())
+	}
 
-    response, err := http.Get("https://www.googleapis.com/oauth2/v2/userinfo?access_token=" + token.AccessToken)
-    if err != nil {
-        return nil, nil, fmt.Errorf("failed getting user info: %s", err.Error())
-    }
-    defer response.Body.Close()
-    contents, err := ioutil.ReadAll(response.Body)
-    if err != nil {
-        return nil, nil, fmt.Errorf("failed reading response body: %s", err.Error())
-    }
+	response, err := http.Get("https://www.googleapis.com/oauth2/v2/userinfo?access_token=" + token.AccessToken)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed getting user info: %s", err.Error())
+	}
+	defer response.Body.Close()
+	contents, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed reading response body: %s", err.Error())
+	}
 
-    userInfo = &UserInfo{}
-    err = json.Unmarshal(contents, userInfo)
-    if err != nil{
-        return nil, nil, err
-    }
+	userInfo = &UserInfo{}
+	err = json.Unmarshal(contents, userInfo)
+	if err != nil {
+		return nil, nil, err
+	}
 
-    return userInfo, token, nil
+	return userInfo, token, nil
 }
-

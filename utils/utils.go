@@ -1,10 +1,46 @@
 package utils
 
-var (
-    serviceName = "google-photo-viewer"
+import (
+	"errors"
+	"fmt"
+	"github.com/gin-contrib/sessions"
+	"github.com/gin-gonic/gin"
+	"golang.org/x/oauth2"
+	"net/http"
 )
 
-//func RetrieveToken(googleUserEmail string) (*oauth2.Token, error) {
+var (
+	serviceName = "google-photo-viewer"
+)
+
+func RetrieveOAuthToken(c *gin.Context) (*oauth2.Token, error) {
+	session := sessions.Default(c)
+	tokenVal := session.Get("token")
+	if tokenVal == nil {
+		return nil, errors.New("unable to find token value of session")
+	}
+	token := tokenVal.(*oauth2.Token)
+	fmt.Println(token.AccessToken)
+	return token, nil
+}
+
+func RetrieveOAuthConf(c *gin.Context) (*oauth2.Config, error) {
+	session := sessions.Default(c)
+	accountIdxInt := c.Param("idx")
+	userInfoVal := session.Get("user-info")
+	if userInfoVal == nil {
+		c.Redirect(http.StatusTemporaryRedirect, fmt.Sprintf("/u/%s", accountIdxInt))
+	}
+	// userInfo := userInfoVal.(*UserInfo)
+	confVal := session.Get("conf")
+	if confVal == nil {
+		return nil, errors.New("unable to find conf value of session")
+	}
+	conf := confVal.(*oauth2.Config)
+	return conf, nil
+}
+
+// func RetrieveToken(googleUserEmail string) (*oauth2.Token, error) {
 //    tokenJSONString, err := keyring.Get(serviceName, googleUserEmail)
 //    if err != nil {
 //        if err == keyring.ErrNotFound {
@@ -27,10 +63,9 @@ var (
 //    }
 //
 //    return &token, nil
-//}
+// }
 
-
-//func StoreToken(googleUserEmail string, token *oauth2.Token) error {
+// func StoreToken(googleUserEmail string, token *oauth2.Token) error {
 //    tokenJSONBytes, err := json.Marshal(token)
 //    if err != nil {
 //        return err
@@ -43,4 +78,4 @@ var (
 //    }
 //
 //    return nil
-//}
+// }
