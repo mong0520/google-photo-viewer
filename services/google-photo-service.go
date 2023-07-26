@@ -3,13 +3,10 @@ package services
 import (
 	"context"
 	"fmt"
-	"go.mongodb.org/mongo-driver/mongo/options"
-	"strings"
-
+	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
-
 	"go.mongodb.org/mongo-driver/bson"
-	"golang.org/x/oauth2"
+	"go.mongodb.org/mongo-driver/mongo/options"
 	"google.golang.org/api/photoslibrary/v1"
 )
 
@@ -34,17 +31,9 @@ type WrappedGooglePhotoAlbum struct {
 	Url   string `json:"url"`
 }
 
-type GetGetAlbumsOptions struct {
-	AccountIndex string
-}
-
 type WrappedGooglePhotoAlbums []WrappedGooglePhotoAlbum
 
-func GetGooglePhotoService(conf *oauth2.Config, token *oauth2.Token) (*GooglePhotoService, error) {
-	if googlePhotoService != nil {
-		return googlePhotoService, nil
-	}
-
+func GetGooglePhotoService(context *gin.Context) (*GooglePhotoService, error) {
 	googlePhotoService = &GooglePhotoService{}
 	service := &photoslibrary.Service{}
 
@@ -53,7 +42,9 @@ func GetGooglePhotoService(conf *oauth2.Config, token *oauth2.Token) (*GooglePho
 	//    return nil, err
 	// }
 
-	client := conf.Client(context.Background(), token)
+	conf := GetSessionService().GetOAuth2Conf(context)
+	token := GetSessionService().GetOAuth2Token(context)
+	client := conf.Client(context, token)
 	service, err := photoslibrary.New(client)
 	if err != nil {
 		return googlePhotoService, err
@@ -67,27 +58,20 @@ func GetGooglePhotoService(conf *oauth2.Config, token *oauth2.Token) (*GooglePho
 	return googlePhotoService, nil
 }
 
-func (g *GooglePhotoService) GetAlbums(options *GetGetAlbumsOptions) ([]WrappedGooglePhotoAlbum, error) {
-	var wrappedGooglePhotoAlbums []WrappedGooglePhotoAlbum
+func (g *GooglePhotoService) GetAlbums() ([]photoslibrary.Album, error) {
 	albumsService := g.AlbumsService
 	albumList := albumsService.List()
 	ret, err := albumList.PageSize(50).Do()
-	albumList.Fields()
+	// albumList.Fields()
 	albumList.Do()
+	var albums []photoslibrary.Album
 	if err != nil {
 		log.Fatal(err)
-		return wrappedGooglePhotoAlbums, err
+		return albums, err
 	}
 	// first time
 	for _, album := range ret.Albums {
-		if options.AccountIndex != "" {
-			album.ProductUrl = strings.Replace(album.ProductUrl, "photos.google.com", "photos.google.com/u/"+options.AccountIndex, -1)
-		}
-		fmt.Println(album.Title, album.ProductUrl)
-		wrappedGooglePhotoAlbums = append(wrappedGooglePhotoAlbums, WrappedGooglePhotoAlbum{
-			Title: album.Title,
-			Url:   album.ProductUrl,
-		})
+		fmt.Println(album.Title, album.ProductUrl, album.TotalMediaItems)
 	}
 	for {
 		nextPageToken := ret.NextPageToken
@@ -97,20 +81,17 @@ func (g *GooglePhotoService) GetAlbums(options *GetGetAlbumsOptions) ([]WrappedG
 		ret, err = albumList.PageToken(nextPageToken).PageSize(50).Do()
 		if err != nil {
 			log.Fatal(err)
-			return wrappedGooglePhotoAlbums, err
+			return albums, err
 		}
 		for _, album := range ret.Albums {
-			if options.AccountIndex != "" {
-				album.ProductUrl = strings.Replace(album.ProductUrl, "photos.google.com", "photos.google.com/u/"+options.AccountIndex, -1)
-			}
-			fmt.Println(album.Title, album.ProductUrl)
-			wrappedGooglePhotoAlbums = append(wrappedGooglePhotoAlbums, WrappedGooglePhotoAlbum{
-				Title: album.Title,
-				Url:   album.ProductUrl,
-			})
+			// if options.AccountIndex != "" {
+			// 	album.ProductUrl = strings.Replace(album.ProductUrl, "photos.google.com", "photos.google.com/u/"+options.AccountIndex, -1)
+			// }
+			fmt.Println(album.Title, album.ProductUrl, album.TotalMediaItems)
+			albums = append(albums, *album)
 		}
 	}
-	return wrappedGooglePhotoAlbums, nil
+	return albums, nil
 }
 
 func upsertMedia(p *photoslibrary.SearchMediaItemsResponse) error {
@@ -189,4 +170,17 @@ func (g *GooglePhotoService) UpsertPhotosToDB() ([]*photoslibrary.MediaItem, err
 		return nil, err
 	}
 	return nil, nil
+}
+
+func (g *GooglePhotoService) UpsertAlbumsToDB(albums []photoslibrary.Album) error {
+	mongodbClient := GetMongoService()
+
+	var newDocuments []interface{}
+	for _, album := range albums {
+		newDocuments = append(newDocuments, album)
+	}
+	collection := mongodbClient.Database("google_photos").Collection("albums")
+	collection.InsertMany(context.Background(), newDocuments)
+
+	return nil
 }

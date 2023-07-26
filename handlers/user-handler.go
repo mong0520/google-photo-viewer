@@ -5,10 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
-	"github.com/joho/godotenv"
-	"github.com/mong0520/google-photo-viewer/utils"
+	"github.com/mong0520/google-photo-viewer/models"
+	"github.com/mong0520/google-photo-viewer/services"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/people/v1"
@@ -18,44 +17,20 @@ import (
 	"os"
 )
 
-type UserInfo struct {
-	ID         string `json:"id"`
-	Name       string `json:"name"`
-	GivenName  string `json:"given_name"`
-	FamilyName string `json:"family_name"`
-	Picture    string `json:"picture"`
-	Locale     string `json:"locale"`
-}
-
 var (
 	// TODO: randomize it
 	oauthStateString = "pseudo-random"
 	conf             *oauth2.Config
-	userInfo         *UserInfo
 )
 
 func MeHandler(c *gin.Context) {
-	session := sessions.Default(c)
-	// accountIdxInt := c.Param("idx")
-	userInfoVal := session.Get("user-info")
-	if userInfoVal == nil {
-		c.Redirect(http.StatusTemporaryRedirect, "/auth")
-		return
-	}
-	_, err := utils.RetrieveOAuthConf(c)
-	if err != nil {
+	userInfo := services.GetSessionService().GetUserInfo(c)
+	if userInfo == nil {
 		c.Redirect(http.StatusTemporaryRedirect, "/auth")
 		return
 	}
 
-	token, err := utils.RetrieveOAuthToken(c)
-	if err != nil {
-		c.Redirect(http.StatusTemporaryRedirect, "/auth")
-		return
-	}
-
-	userInfo := userInfoVal.(*UserInfo)
-	if userInfo != nil && token != nil {
+	if userInfo != nil {
 		c.HTML(http.StatusOK, "me.html", gin.H{
 			"userInfo": userInfo,
 		})
@@ -63,9 +38,7 @@ func MeHandler(c *gin.Context) {
 }
 
 func LoginHandler(c *gin.Context) {
-	// get Google App clients and secrets
-	// oauthStateString = c.Param("idx")
-	godotenv.Load()
+	// godotenv.Load()
 	// ask the user to authenticate on google in the browser
 	// ref: https://itnext.io/getting-started-with-oauth2-in-go-1c692420e03
 	conf = &oauth2.Config{
@@ -88,26 +61,18 @@ func LoginHandler(c *gin.Context) {
 }
 
 func CallbackHandler(c *gin.Context) {
-	session := sessions.Default(c)
-	// accountIdx := c.Query("state")
 	userInfo, token, err := getAccessToken(c.Query("state"), c.Query("code"))
 	if err != nil {
 		c.Error(err)
 	}
+	services.GetSessionService().SetSessionEntity(c, "user-info", userInfo)
+	services.GetSessionService().SetSessionEntity(c, "conf", conf)
+	services.GetSessionService().SetSessionEntity(c, "token", token)
 
-	session.Set("user-info", userInfo)
-	session.Set("conf", conf)
-	session.Set("token", token)
-	session.Save()
-	fmt.Printf("token = %s\n", token)
-	// err = utils.StoreToken(userInfo.ID, token)
-	// if err != nil {
-	//    c.Error(err)
-	// }
 	c.Redirect(http.StatusTemporaryRedirect, "me")
 }
 
-func getAccessToken(state string, code string) (*UserInfo, *oauth2.Token, error) {
+func getAccessToken(state string, code string) (*models.UserInfo, *oauth2.Token, error) {
 	if state != oauthStateString {
 		return nil, nil, fmt.Errorf("invalid oauth state")
 	}
@@ -126,7 +91,7 @@ func getAccessToken(state string, code string) (*UserInfo, *oauth2.Token, error)
 		return nil, nil, fmt.Errorf("failed reading response body: %s", err.Error())
 	}
 
-	userInfo = &UserInfo{}
+	userInfo := &models.UserInfo{}
 	err = json.Unmarshal(contents, userInfo)
 	if err != nil {
 		return nil, nil, err

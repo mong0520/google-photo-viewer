@@ -3,96 +3,58 @@ package handlers
 import (
 	"context"
 	"encoding/json"
-	"errors"
-	"fmt"
-	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"github.com/mong0520/google-photo-viewer/services"
-	"github.com/mong0520/google-photo-viewer/utils"
 	"google.golang.org/api/photoslibrary/v1"
 	"net/http"
 	"time"
 )
 
-func InitMediaItemsHandler(c *gin.Context) {
-	conf, err := utils.RetrieveOAuthConf(c)
+//	func InitMediaItemsHandler(c *gin.Context) {
+//		var mediaItems []*photoslibrary.MediaItem
+//
+//		svc := services.GetGooglePhotoService()
+//
+//		mediaItems, err := svc.UpsertPhotosToDB()
+//		if err != nil {
+//			c.Error(err)
+//		}
+//
+//		for _, item := range mediaItems {
+//			fmt.Println(item)
+//		}
+//	}
+func SaveAlbumsHandler(c *gin.Context) {
+	svc, err := services.GetGooglePhotoService(c)
 	if err != nil {
-		c.HTML(http.StatusOK, "error.html", gin.H{
-			"errorMessage": err,
-		})
+		c.Error(err)
 	}
-	token, err := utils.RetrieveOAuthToken(c)
-	if err != nil {
-		c.HTML(http.StatusOK, "error.html", gin.H{
-			"errorMessage": err,
-		})
-	}
-
-	var mediaItems []*photoslibrary.MediaItem
-
-	svc, err := services.GetGooglePhotoService(conf, token)
+	// options := &services.GetGetAlbumsOptions{}
+	albums, err := svc.GetAlbums()
 	if err != nil {
 		c.Error(err)
 	}
 
-	mediaItems, err = svc.UpsertPhotosToDB()
-	if err != nil {
-		c.Error(err)
-	}
-
-	for _, item := range mediaItems {
-		fmt.Println(item)
-	}
+	svc.UpsertAlbumsToDB(albums)
 }
 
 func AlbumHandler(c *gin.Context) {
-	session := sessions.Default(c)
-	accountIdxInt := c.Param("idx")
-	userInfoVal := session.Get("user-info")
-	if userInfoVal == nil {
-		c.Redirect(http.StatusTemporaryRedirect, "/auth")
-		return
-	}
-
-	userInfo := userInfoVal.(*UserInfo)
-	confVal := session.Get("conf")
-	if confVal == nil {
-		c.Redirect(http.StatusTemporaryRedirect, "/auth")
-		return
-	}
-
-	conf, err := utils.RetrieveOAuthConf(c)
-	if err != nil {
-		c.HTML(http.StatusOK, "error.html", gin.H{
-			"errorMessage": err,
-		})
-	}
-	token, err := utils.RetrieveOAuthToken(c)
-	if err != nil {
-		c.HTML(http.StatusOK, "error.html", gin.H{
-			"errorMessage": err,
-		})
-	}
-
 	redisSvc := services.GetRedisService()
-	if redisSvc == nil {
-		c.Error(errors.New("unable to get redis client"))
-		return
-	}
+	var albums []photoslibrary.Album
 
 	// Get result from redis
-	var albums []services.WrappedGooglePhotoAlbum
+	userInfo := services.GetSessionService().GetUserInfo(c)
 	result, err := redisSvc.Get(context.Background(), userInfo.ID).Bytes()
 	// svc.ListPhotos()
 	if err != nil || len(result) == 0 {
 		// not hit cache
-		options := &services.GetGetAlbumsOptions{AccountIndex: accountIdxInt}
-		svc, err := services.GetGooglePhotoService(conf, token)
+		// options := &services.GetGetAlbumsOptions{}
+		svc, err := services.GetGooglePhotoService(c)
 		if err != nil {
 			c.Error(err)
 		}
 
-		albums, err = svc.GetAlbums(options)
+		albums, err = svc.GetAlbums()
 		if err != nil {
 			c.Error(err)
 		}
