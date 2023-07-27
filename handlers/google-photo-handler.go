@@ -10,25 +10,38 @@ import (
 	"time"
 )
 
-//	func InitMediaItemsHandler(c *gin.Context) {
-//		var mediaItems []*photoslibrary.MediaItem
-//
-//		svc := services.GetGooglePhotoService()
-//
-//		mediaItems, err := svc.UpsertPhotosToDB()
-//		if err != nil {
-//			c.Error(err)
-//		}
-//
-//		for _, item := range mediaItems {
-//			fmt.Println(item)
-//		}
-//	}
+func SaveMediaItemsHandler(c *gin.Context) {
+	// var mediaItems []*photoslibrary.MediaItem
+
+	svc, err := services.GetGooglePhotoService(c)
+	if err != nil {
+		c.Error(err)
+	}
+
+	go svc.UpsertPhotosToDB()
+
+	c.HTML(http.StatusOK, "media_items.html", nil)
+	// mediaItems, err = svc.UpsertPhotosToDB()
+	// if err != nil {
+	// 	c.Error(err)
+	// }
+	//
+	// for _, item := range mediaItems {
+	// 	fmt.Println(item)
+	// }
+}
+
 func SaveAlbumsHandler(c *gin.Context) {
 	svc, err := services.GetGooglePhotoService(c)
 	if err != nil {
 		c.Error(err)
 	}
+
+	// force expire redis data
+	redisSvc := services.GetRedisService()
+	userInfo := services.GetSessionService().GetUserInfo(c)
+	redisSvc.Del(c, userInfo.ID)
+
 	// options := &services.GetGetAlbumsOptions{}
 	albums, err := svc.GetAlbums()
 	if err != nil {
@@ -36,9 +49,18 @@ func SaveAlbumsHandler(c *gin.Context) {
 	}
 
 	svc.UpsertAlbumsToDB(albums)
+
+	albumsBytes, err := json.Marshal(albums)
+	if err != nil {
+		c.Error(err)
+	}
+	_, err = redisSvc.SetEX(context.Background(), userInfo.ID, albumsBytes, 86400*time.Second).Result()
+	if err != nil {
+		c.Error(err)
+	}
 }
 
-func AlbumHandler(c *gin.Context) {
+func GetAlbumsHandler(c *gin.Context) {
 	redisSvc := services.GetRedisService()
 	var albums []photoslibrary.Album
 

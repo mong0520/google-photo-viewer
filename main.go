@@ -56,8 +56,9 @@ func main() {
 	r.GET("/", handlers.PortalHandler).Use(validToken)
 	r.GET("/auth", handlers.AuthHandler)
 	r.GET("/callback", handlers.CallbackHandler)
-	r.GET("/albums", handlers.AlbumHandler).Use(validToken)
+	r.GET("/albums", handlers.GetAlbumsHandler).Use(validToken)
 	r.GET("/albums/save", handlers.SaveAlbumsHandler).Use(validToken)
+	r.GET("/media_items/save", handlers.SaveMediaItemsHandler).Use(validToken)
 
 	r.Run(":80")
 }
