@@ -178,12 +178,55 @@ func (g *GooglePhotoService) UpsertPhotosToDB() ([]*photoslibrary.MediaItem, err
 func (g *GooglePhotoService) UpsertAlbumsToDB(albums []photoslibrary.Album) error {
 	mongodbClient := GetMongoService()
 
-	var newDocuments []interface{}
+	options := options.InsertMany().SetOrdered(false)
+	var docs []interface{}
+	var existingIDs []string
 	for _, album := range albums {
-		newDocuments = append(newDocuments, album)
+		docs = append(docs, album)
+		existingIDs = append(existingIDs, album.Id)
 	}
 	collection := mongodbClient.Database("google_photos").Collection("albums")
-	collection.InsertMany(context.Background(), newDocuments)
+	var existingMap map[string]bool
+	if len(existingIDs) > 0 {
+		// Prepare a filter to check for existing documents
+		filter := bson.M{"id": bson.M{"$in": existingIDs}}
+		// Find the existing documents in the collection
+		existingCursor, err := collection.Find(context.Background(), filter)
+		if err != nil {
+			log.Fatal("Failed to find existing documents:", err)
+		}
+		defer existingCursor.Close(context.Background())
+		// Prepare a map to store the existing document IDs
+		existingMap = make(map[string]bool)
+		for existingCursor.Next(context.Background()) {
+			var existingData photoslibrary.MediaItem
+			if err := existingCursor.Decode(&existingData); err != nil {
+				log.Fatal("Failed to decode existing document:", err)
+			}
+			existingMap[existingData.Id] = true
+		}
+	}
+
+	var newDocuments []interface{}
+	for _, album := range albums {
+		// Skip the document if it already exists in the collection
+		if existingMap[album.Id] {
+			fmt.Printf("Document with ID '%s' already exists. Skipping insertion.\n", album.Id)
+			continue
+		}
+		newDocuments = append(newDocuments, album)
+	}
+
+	if len(newDocuments) == 0 {
+		return nil
+	}
+
+	_, err := collection.InsertMany(context.Background(), newDocuments, options)
+	if err != nil {
+		fmt.Println(err)
+	} else {
+		fmt.Printf("Insert %d records to db\n", len(docs))
+	}
 
 	return nil
 }

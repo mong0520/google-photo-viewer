@@ -20,7 +20,7 @@ func SaveMediaItemsHandler(c *gin.Context) {
 
 	go svc.UpsertPhotosToDB()
 
-	c.HTML(http.StatusOK, "media_items.html", nil)
+	c.HTML(http.StatusOK, "save_media_items.html", nil)
 	// mediaItems, err = svc.UpsertPhotosToDB()
 	// if err != nil {
 	// 	c.Error(err)
@@ -48,7 +48,7 @@ func SaveAlbumsHandler(c *gin.Context) {
 		c.Error(err)
 	}
 
-	svc.UpsertAlbumsToDB(albums)
+	go svc.UpsertAlbumsToDB(albums)
 
 	albumsBytes, err := json.Marshal(albums)
 	if err != nil {
@@ -58,6 +58,8 @@ func SaveAlbumsHandler(c *gin.Context) {
 	if err != nil {
 		c.Error(err)
 	}
+
+	c.Redirect(http.StatusTemporaryRedirect, "/albums")
 }
 
 func GetAlbumsHandler(c *gin.Context) {
