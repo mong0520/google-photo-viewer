@@ -1,6 +1,5 @@
 package handlers
 
-import "C"
 import (
 	"context"
 	"encoding/json"
@@ -23,24 +22,7 @@ var (
 	conf             *oauth2.Config
 )
 
-func MeHandler(c *gin.Context) {
-	userInfo := services.GetSessionService().GetUserInfo(c)
-	if userInfo == nil {
-		c.Redirect(http.StatusTemporaryRedirect, "/auth")
-		return
-	}
-
-	if userInfo != nil {
-		c.HTML(http.StatusOK, "me.html", gin.H{
-			"userInfo": userInfo,
-		})
-	}
-}
-
-func LoginHandler(c *gin.Context) {
-	// godotenv.Load()
-	// ask the user to authenticate on google in the browser
-	// ref: https://itnext.io/getting-started-with-oauth2-in-go-1c692420e03
+func AuthHandler(c *gin.Context) {
 	conf = &oauth2.Config{
 		ClientID:     os.Getenv("ClientID"),
 		ClientSecret: os.Getenv("ClientSecret"),
@@ -69,7 +51,7 @@ func CallbackHandler(c *gin.Context) {
 	services.GetSessionService().SetSessionEntity(c, "conf", conf)
 	services.GetSessionService().SetSessionEntity(c, "token", token)
 
-	c.Redirect(http.StatusTemporaryRedirect, "me")
+	c.Redirect(http.StatusTemporaryRedirect, "/")
 }
 
 func getAccessToken(state string, code string) (*models.UserInfo, *oauth2.Token, error) {
@@ -98,4 +80,18 @@ func getAccessToken(state string, code string) (*models.UserInfo, *oauth2.Token,
 	}
 
 	return userInfo, token, nil
+}
+
+func PortalHandler(c *gin.Context) {
+	userInfo := services.GetSessionService().GetUserInfo(c)
+	if userInfo == nil {
+		c.Redirect(http.StatusTemporaryRedirect, "/auth")
+		return
+	}
+
+	if userInfo != nil {
+		c.HTML(http.StatusOK, "me.html", gin.H{
+			"userInfo": userInfo,
+		})
+	}
 }

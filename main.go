@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/gob"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	"github.com/mong0520/google-photo-viewer/handlers"
@@ -11,6 +12,7 @@ import (
 	"golang.org/x/oauth2"
 	"net/http"
 	"os"
+	"time"
 )
 
 func initializeStorageService(r *gin.Engine) {
@@ -33,25 +35,29 @@ func initializeStorageService(r *gin.Engine) {
 	}
 }
 
+func validToken(c *gin.Context) {
+	token := services.GetSessionService().GetOAuth2Token(c)
+	if token != nil && token.Expiry.Before(time.Now()) {
+		fmt.Println("token is expired")
+		c.Redirect(http.StatusTemporaryRedirect, "/auth")
+		return
+	}
+}
+
 func main() {
 	r := gin.Default()
 	initializeStorageService(r)
 
 	r.LoadHTMLGlob("view/*")
-	r.GET("/u/:idx/albums", handlers.AlbumHandler)
-	// r.GET("/u/:idx/listMedia", handlers.ListMediaItemsHandler)
-	r.GET("/u/:idx", handlers.MainHandler)
-	// r.GET("/login/u/:idx", handlers.LoginHandler)
-	r.GET("/callback", handlers.CallbackHandler)
 	r.GET("/check", func(c *gin.Context) {
 		c.String(http.StatusOK, "ok")
 	})
 
-	r.GET("/me", handlers.MeHandler)
-	r.GET("/auth", handlers.LoginHandler)
-	r.GET("/albums", handlers.AlbumHandler)
-	r.GET("/albums/save", handlers.SaveAlbumsHandler)
-	// r.GET("/media/init", handlers.InitMediaItemsHandler)
+	r.GET("/", handlers.PortalHandler).Use(validToken)
+	r.GET("/auth", handlers.AuthHandler)
+	r.GET("/callback", handlers.CallbackHandler)
+	r.GET("/albums", handlers.AlbumHandler).Use(validToken)
+	r.GET("/albums/save", handlers.SaveAlbumsHandler).Use(validToken)
 
 	r.Run(":80")
 }

@@ -1,7 +1,6 @@
 package services
 
 import (
-	"fmt"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/redis"
 	"github.com/gin-gonic/gin"
@@ -36,7 +35,7 @@ func (m *SessionService) GetUserInfo(c *gin.Context) *models.UserInfo {
 		return nil
 	}
 
-	fmt.Println(userInfoVal)
+	// fmt.Println(userInfoVal)
 	ret := userInfoVal.(*models.UserInfo)
 	return ret
 }

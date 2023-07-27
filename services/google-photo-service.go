@@ -62,6 +62,9 @@ func (g *GooglePhotoService) GetAlbums() ([]photoslibrary.Album, error) {
 	albumsService := g.AlbumsService
 	albumList := albumsService.List()
 	ret, err := albumList.PageSize(50).Do()
+	if err != nil {
+		return nil, err
+	}
 	// albumList.Fields()
 	albumList.Do()
 	var albums []photoslibrary.Album
