@@ -66,21 +66,14 @@ func (g *GooglePhotoService) GetAlbums() ([]photoslibrary.Album, error) {
 		return nil, err
 	}
 	// albumList.Fields()
-	albumList.Do()
 	var albums []photoslibrary.Album
 	if err != nil {
 		log.Fatal(err)
 		return albums, err
 	}
-	// first time
-	for _, album := range ret.Albums {
-		fmt.Println(album.Title, album.ProductUrl, album.TotalMediaItems)
-	}
+
+	nextPageToken := ""
 	for {
-		nextPageToken := ret.NextPageToken
-		if nextPageToken == "" {
-			break
-		}
 		ret, err = albumList.PageToken(nextPageToken).PageSize(50).Do()
 		if err != nil {
 			log.Fatal(err)
@@ -92,6 +85,10 @@ func (g *GooglePhotoService) GetAlbums() ([]photoslibrary.Album, error) {
 			// }
 			fmt.Println(album.Title, album.ProductUrl, album.TotalMediaItems)
 			albums = append(albums, *album)
+		}
+		nextPageToken = ret.NextPageToken
+		if nextPageToken == "" {
+			break
 		}
 	}
 	return albums, nil

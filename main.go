@@ -40,8 +40,8 @@ func validToken(c *gin.Context) {
 	if token != nil && token.Expiry.Before(time.Now()) {
 		fmt.Println("token is expired")
 		c.Redirect(http.StatusTemporaryRedirect, "/auth")
-		return
 	}
+	c.Next()
 }
 
 func main() {
@@ -53,12 +53,12 @@ func main() {
 		c.String(http.StatusOK, "ok")
 	})
 
-	r.GET("/", handlers.PortalHandler).Use(validToken)
+	r.GET("/", validToken, handlers.PortalHandler)
 	r.GET("/auth", handlers.AuthHandler)
 	r.GET("/callback", handlers.CallbackHandler)
-	r.GET("/albums", handlers.GetAlbumsHandler).Use(validToken)
-	r.GET("/albums/save", handlers.SaveAlbumsHandler).Use(validToken)
-	r.GET("/media_items/save", handlers.SaveMediaItemsHandler).Use(validToken)
+	r.GET("/albums", validToken, handlers.GetAlbumsHandler)
+	r.GET("/albums/save", validToken, handlers.SaveAlbumsHandler)
+	r.GET("/media_items/save", validToken, handlers.SaveMediaItemsHandler)
 
 	r.Run(":80")
 }

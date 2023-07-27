@@ -64,12 +64,11 @@ func SaveAlbumsHandler(c *gin.Context) {
 
 func GetAlbumsHandler(c *gin.Context) {
 	redisSvc := services.GetRedisService()
+	userInfo := services.GetSessionService().GetUserInfo(c)
 	var albums []photoslibrary.Album
 
 	// Get result from redis
-	userInfo := services.GetSessionService().GetUserInfo(c)
 	result, err := redisSvc.Get(context.Background(), userInfo.ID).Bytes()
-	// svc.ListPhotos()
 	if err != nil || len(result) == 0 {
 		// not hit cache
 		// options := &services.GetGetAlbumsOptions{}
