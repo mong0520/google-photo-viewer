@@ -6,9 +6,10 @@ services:
     ports:
       - 80:80
     env_file:
-      - .env
+      - .env.docker
     depends_on:
       - redis
+      - mongo
   redis:
     restart: always
     container_name: redis
@@ -16,8 +17,7 @@ services:
     ports:
       - 6379:6379
     volumes:
-      - ./data/redis-data:/data
-
+      - ./.docker/redis_data:/data
   mongo:
     image: mongo
     container_name: mongodb-container
